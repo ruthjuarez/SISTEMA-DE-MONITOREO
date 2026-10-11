@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoreo de Calidad del Agua - Dashboard en Tiempo Real</title>
+
+    <!-- Google Fonts para tipografía moderna -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+
+    <!-- Lucide Icons CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+
+    <!-- Chart.js CDN para gráficos en tiempo real -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Firebase SDK v10 (Compatibilidad para scripts cliente vanilla) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+    <!-- Estilos de la aplicación -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body class="dark-theme">
+
+    <!-- Capa sutil de partículas de fondo -->
+    <div id="particle-container"></div>
+
+    <div class="app-container">
+
+        <!-- HEADER PRINCIPAL NEUTRO Y PROFESIONAL -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="header-icon-box">
+                    <i data-lucide="activity" class="header-icon"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>Monitoreo de Calidad del Agua</h1>
+                    <span class="subtitle">Panel de Telemetría IoT en Tiempo Real</span>
+                </div>
+            </div>
+
+            <div class="header-status">
+                <!-- Estado de conexión del dispositivo -->
+                <div class="status-indicator" id="device-status-badge">
+                    <span class="status-dot red-pulse" id="device-status-dot"></span>
+                    <span id="device-status-text">DISPOSITIVO DESCONECTADO</span>
+                </div>
+
+                <!-- Estado de Firebase -->
+                <div class="mode-badge" id="firebase-status-badge">
+                    <i data-lucide="database" class="badge-icon"></i>
+                    <span id="firebase-status-text">Firebase: Esperando Configuración</span>
+                </div>
+
+                <div class="divider"></div>
+
+                <!-- Reloj en vivo -->
+                <div class="clock-badge">
+                    <i data-lucide="clock" class="badge-icon"></i>
+                    <span id="live-clock">--:--:--</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- BANNER DE CONFIGURACIÓN DE FIREBASE (Informativo si faltan credenciales) -->
+        <div class="setup-notice glass" id="setup-notice-banner" style="display: none;">
+            <div class="setup-notice-content">
+                <div class="setup-notice-icon">
+                    <i data-lucide="alert-circle"></i>
+                </div>
+                <div class="setup-notice-text">
+                    <strong>Configuración de Firebase pendiente:</strong>
+                    <span>Para recibir datos en vivo desde tu dispositivo (ESP32 / IoT), edita la sección indicada en <code>js/app.js</code> con tus credenciales de Firebase Console.</span>
+                </div>
+            </div>
+            <button class="btn btn-sm btn-outline" id="btn-dismiss-notice">Entendido</button>
+        </div>
+
+        <!-- SECCIÓN 1: TRES TARJETAS PRINCIPALES (pH, TURBIDEZ, TEMPERATURA) -->
+        <section class="sensor-cards-grid">
+
+            <!-- TARJETA 1: pH -->
+            <div class="dashboard-card sensor-card glass" id="card-ph">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i data-lucide="droplet" class="title-icon icon-ph"></i>
+                        <span>pH</span>
+                    </div>
+                    <span class="sensor-range">0.0 - 14.0 pH</span>
+                </div>
+                <div class="card-body">
+                    <div class="gauge-wrapper">
+                        <svg class="gauge-svg" viewBox="0 0 100 100">
+                            <circle class="gauge-bg" cx="50" cy="50" r="40" />
+                            <circle id="gauge-ph-progress" class="gauge-progress" cx="50" cy="50" r="40" />
+                        </svg>
+                        <div class="gauge-content">
+                            <span class="gauge-value" id="val-ph">--</span>
+                            <span class="gauge-unit">pH</span>
+                        </div>
+                    </div>
+                    <div class="sensor-stats">
+                        <span class="status-pill status-waiting" id="pill-ph">Esperando datos</span>
+                        <div class="sensor-feedback" id="feedback-ph">Rango seguro potable: 6.5 - 8.5 pH</div>
+                    </div>
+                    <div class="stats-mini-row">
+                        <div class="mini-stat">
+                            <span class="lbl">Mín</span>
+                            <span class="val" id="min-ph">--</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="lbl">Promedio</span>
+                            <span class="val" id="avg-ph">--</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="lbl">Máx</span>
+                            <span class="val" id="max-ph">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TARJETA 2: TURBIDEZ -->
+            <div class="dashboard-card sensor-card glass" id="card-turbidity">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i data-lucide="waves" class="title-icon icon-turb"></i>
+                        <span>Turbidez</span>
+                    </div>
+                    <span class="sensor-range">0 - 100 NTU</span>
+                </div>
+                <div class="card-body">
+                    <div class="turb-display-wrapper">
+                        <div class="metric-big-value">
+                            <span id="val-turb">--</span>
+                            <span class="unit">NTU</span>
+                        </div>
+                        <div class="indicator-bar-container">
+                            <div class="indicator-bar" id="bar-turb" style="width: 0%;"></div>
+                        </div>
+                        <div class="bar-labels">
+                            <span>0 NTU (Cristalina)</span>
+                            <span>5 NTU (Límite OMS)</span>
+                            <span>&gt; 20 NTU</span>
+                        </div>
+                    </div>
+                    <div class="sensor-stats">
+                        <span class="status-pill status-waiting" id="pill-turb">Esperando datos</span>
+                        <div class="sensor-feedback" id="feedback-turb">Norma recomendada: &lt; 5.0 NTU</div>
+                    </div>
+                    <div class="stats-mini-row">
+                        <div class="mini-stat">
+                            <span class="lbl">Mín</span>
+                            <span class="val" id="min-turb">--</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="lbl">Promedio</span>
+                            <span class="val" id="avg-turb">--</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="lbl">Máx</span>
+                            <span class="val" id="max-turb">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TARJETA 3: TEMPERATURA -->
+            <div class="dashboard-card sensor-card glass" id="card-temperature">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i data-lucide="thermometer" class="title-icon icon-temp"></i>
+                        <span>Temperatura</span>
+                    </div>
+                    <span class="sensor-range">0.0 - 50.0 °C</span>
+                </div>
+                <div class="card-body">
+                    <div class="temp-display-wrapper">
+                        <div class="metric-big-value">
+                            <span id="val-temp">--</span>
+                            <span class="unit">°C</span>
+                        </div>
+                        <div class="indicator-bar-container">
+                            <div class="indicator-bar" id="bar-temp" style="width: 0%;"></div>
+                        </div>
+                        <div class="bar-labels">
+                            <span>0 °C</span>
+                            <span>20 °C (Óptima)</span>
+                            <span>50 °C</span>
+                        </div>
+                    </div>
+                    <div class="sensor-stats">
+                        <span class="status-pill status-waiting" id="pill-temp">Esperando datos</span>
+                        <div class="sensor-feedback" id="feedback-temp">Rango común en agua: 15.0 - 25.0 °C</div>
+                    </div>
+                    <div class="stats-mini-row">
+                        <div class="mini-stat">
+                            <span class="lbl">Mín</span>
+                            <span class="val" id="min-temp">--</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="lbl">Promedio</span>
+                            <span class="val" id="avg-temp">--</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="lbl">Máx</span>
+                            <span class="val" id="max-temp">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- SECCIÓN 2: ESTADO DETALLADO DE CONEXIÓN Y TELEMETRÍA -->
+        <section class="telemetry-bar glass">
+            <div class="telemetry-item">
+                <i data-lucide="radio" class="telemetry-icon"></i>
+                <div class="telemetry-text">
+                    <span class="label">Dispositivo IoT</span>
+                    <span class="value" id="device-channel-text">ESP32 / Sensor Node</span>
+                </div>
+            </div>
+            <div class="telemetry-item">
+                <i data-lucide="clock" class="telemetry-icon"></i>
+                <div class="telemetry-text">
+                    <span class="label">Última Lectura Recibida</span>
+                    <span class="value" id="last-update-time">Sin datos aún</span>
+                </div>
+            </div>
+            <div class="telemetry-item">
+                <i data-lucide="layers" class="telemetry-icon"></i>
+                <div class="telemetry-text">
+                    <span class="label">Paquetes Registrados</span>
+                    <span class="value" id="packets-count">0 muestras</span>
+                </div>
+            </div>
+            <div class="telemetry-item">
+                <i data-lucide="database" class="telemetry-icon"></i>
+                <div class="telemetry-text">
+                    <span class="label">Ruta en Firebase</span>
+                    <span class="value" id="firebase-path-text">sensores/actual</span>
+                </div>
+            </div>
+            <div class="telemetry-actions">
+                <button class="btn btn-sm btn-primary-outline" id="btn-export-csv" title="Descargar datos en formato CSV">
+                    <i data-lucide="download" class="btn-icon"></i>
+                    <span>Exportar CSV</span>
+                </button>
+                <button class="btn btn-sm btn-outline" id="btn-clear-history" title="Reiniciar datos de las gráficas">
+                    <i data-lucide="rotate-ccw" class="btn-icon"></i>
+                    <span>Limpiar</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 3: UNA GRÁFICA HISTÓRICA PARA CADA PARÁMETRO -->
+        <section class="charts-section">
+            <div class="charts-header">
+                <div class="section-title">
+                    <i data-lucide="line-chart" class="title-icon"></i>
+                    <h2>Gráficas Históricas en Tiempo Real</h2>
+                </div>
+                <div class="chart-points-selector">
+                    <span class="selector-label">Muestras visibles:</span>
+                    <select id="select-chart-points" class="chart-select">
+                        <option value="20">Últimas 20</option>
+                        <option value="50" selected>Últimas 50</option>
+                        <option value="100">Últimas 100</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <!-- GRÁFICA 1: HISTÓRICO DE pH -->
+                <div class="dashboard-card chart-card glass">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i data-lucide="droplet" class="title-icon icon-ph"></i>
+                            <span>Histórico de pH</span>
+                        </div>
+                        <div class="chart-badge" id="chart-badge-ph">-- pH</div>
+                    </div>
+                    <div class="card-body chart-body">
+                        <div class="chart-container">
+                            <canvas id="chart-ph"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GRÁFICA 2: HISTÓRICO DE TURBIDEZ -->
+                <div class="dashboard-card chart-card glass">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i data-lucide="waves" class="title-icon icon-turb"></i>
+                            <span>Histórico de Turbidez (NTU)</span>
+                        </div>
+                        <div class="chart-badge" id="chart-badge-turb">-- NTU</div>
+                    </div>
+                    <div class="card-body chart-body">
+                        <div class="chart-container">
+                            <canvas id="chart-turb"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GRÁFICA 3: HISTÓRICO DE TEMPERATURA -->
+                <div class="dashboard-card chart-card glass">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i data-lucide="thermometer" class="title-icon icon-temp"></i>
+                            <span>Histórico de Temperatura (°C)</span>
+                        </div>
+                        <div class="chart-badge" id="chart-badge-temp">-- °C</div>
+                    </div>
+                    <div class="card-body chart-body">
+                        <div class="chart-container">
+                            <canvas id="chart-temp"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 4: BITÁCORA DE CONEXIÓN Y EVENTOS -->
+        <section class="dashboard-card glass log-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i data-lucide="terminal" class="title-icon"></i>
+                    <span>Registro de Conexión y Telemetría</span>
+                </div>
+                <span class="badge" id="logs-count">0 eventos</span>
+            </div>
+            <div class="card-body">
+                <div class="terminal-log" id="system-logs">
+                    <!-- Los eventos de conexión y telemetría reales se inyectan vía JavaScript -->
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Scripts de la aplicación -->
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
