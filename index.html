@@ -19,12 +19,20 @@
     <!-- Chart.js CDN para gráficos en tiempo real -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- jsPDF y AutoTable para generación de reportes ejecutivos en PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
     <!-- Firebase SDK v10 (Compatibilidad para scripts cliente vanilla) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
-    <!-- Estilos de la aplicación -->
+    <!-- Estilos de la aplicación y PWA -->
     <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#070c16">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 
 <body class="dark-theme">
@@ -61,6 +69,12 @@
 
                 <div class="divider"></div>
 
+                <!-- Botón Alarma Sonora -->
+                <button class="sound-toggle-btn" id="btn-sound-toggle" title="Activar / Silenciar alarma de umbrales críticos">
+                    <i data-lucide="volume-2" class="badge-icon" id="sound-icon"></i>
+                    <span id="sound-status-text">Alarma: On</span>
+                </button>
+
                 <!-- Reloj en vivo -->
                 <div class="clock-badge">
                     <i data-lucide="clock" class="badge-icon"></i>
@@ -83,135 +97,303 @@
             <button class="btn btn-sm btn-outline" id="btn-dismiss-notice">Entendido</button>
         </div>
 
-        <!-- SECCIÓN 1: TRES TARJETAS PRINCIPALES (pH, TURBIDEZ, TEMPERATURA) -->
-        <section class="sensor-cards-grid">
-
-            <!-- TARJETA 1: pH -->
-            <div class="dashboard-card sensor-card glass" id="card-ph">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i data-lucide="droplet" class="title-icon icon-ph"></i>
-                        <span>pH</span>
+        <!-- BANNER HERO: EFICIENCIA Y RENDIMIENTO DEL SISTEMA DE FILTRACIÓN -->
+        <section class="dashboard-card glass filter-hero-card">
+            <div class="filter-hero-header">
+                <div class="filter-hero-title">
+                    <div class="icon-filter-box">
+                        <i data-lucide="filter" class="icon-filter"></i>
                     </div>
-                    <span class="sensor-range">0.0 - 14.0 pH</span>
+                    <div>
+                        <h2>Rendimiento del Sistema de Filtración</h2>
+                        <span class="subtitle">Evaluación comparativa continua entre Entrada (Agua Cruda) y Salida (Agua Purificada)</span>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="gauge-wrapper">
-                        <svg class="gauge-svg" viewBox="0 0 100 100">
-                            <circle class="gauge-bg" cx="50" cy="50" r="40" />
-                            <circle id="gauge-ph-progress" class="gauge-progress" cx="50" cy="50" r="40" />
-                        </svg>
-                        <div class="gauge-content">
-                            <span class="gauge-value" id="val-ph">--</span>
-                            <span class="gauge-unit">pH</span>
+                <div class="filter-status-box">
+                    <span class="status-pill status-waiting" id="pill-filter-status">Esperando lecturas</span>
+                </div>
+            </div>
+
+            <div class="filter-metrics-grid">
+                <!-- Eficiencia de remoción -->
+                <div class="filter-metric-card highlight-metric">
+                    <div class="metric-top">
+                        <span class="metric-label">Eficiencia de Remoción de Turbidez</span>
+                        <i data-lucide="percent" class="metric-mini-icon"></i>
+                    </div>
+                    <div class="metric-center">
+                        <span class="big-metric-num" id="val-filter-efficiency">--</span>
+                        <span class="big-metric-unit">%</span>
+                    </div>
+                    <div class="filter-progress-container">
+                        <div class="filter-progress-bar" id="bar-filter-efficiency" style="width: 0%;"></div>
+                    </div>
+                    <span class="metric-hint" id="hint-filter-efficiency">Remoción de sólidos suspendidos</span>
+                </div>
+
+                <!-- Turbidez removida -->
+                <div class="filter-metric-card">
+                    <div class="metric-top">
+                        <span class="metric-label">Turbidez Retenida</span>
+                        <i data-lucide="waves" class="metric-mini-icon"></i>
+                    </div>
+                    <div class="metric-center">
+                        <span class="big-metric-num" id="val-turb-removed">--</span>
+                        <span class="big-metric-unit">NTU</span>
+                    </div>
+                    <span class="metric-hint" id="hint-turb-removed">Diferencia entre entrada y salida</span>
+                </div>
+
+                <!-- Variación de pH -->
+                <div class="filter-metric-card">
+                    <div class="metric-top">
+                        <span class="metric-label">Variación de pH (&Delta;pH)</span>
+                        <i data-lucide="droplet" class="metric-mini-icon"></i>
+                    </div>
+                    <div class="metric-center">
+                        <span class="big-metric-num" id="val-ph-delta">--</span>
+                        <span class="big-metric-unit">pH</span>
+                    </div>
+                    <span class="metric-hint" id="hint-ph-delta">Estabilidad del pH tras filtración</span>
+                </div>
+
+                <!-- Variación de Temperatura -->
+                <div class="filter-metric-card">
+                    <div class="metric-top">
+                        <span class="metric-label">Diferencial Térmico (&Delta;T)</span>
+                        <i data-lucide="thermometer" class="metric-mini-icon"></i>
+                    </div>
+                    <div class="metric-center">
+                        <span class="big-metric-num" id="val-temp-delta">--</span>
+                        <span class="big-metric-unit">°C</span>
+                    </div>
+                    <span class="metric-hint" id="hint-temp-delta">Salida vs Entrada</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 1: COMPARATIVA DE ETAPAS (ANTES VS DESPUÉS DE LA FILTRACIÓN) -->
+        <section class="stages-comparison-container">
+
+            <!-- ETAPA 1: ANTES DE LA FILTRACIÓN (AGUA CRUDA / ENTRADA) -->
+            <div class="stage-column stage-before-box">
+                <div class="stage-header-badge stage-badge-amber">
+                    <div class="stage-header-title">
+                        <i data-lucide="arrow-down-right" class="stage-icon"></i>
+                        <div>
+                            <h3>1. Antes de la Filtración</h3>
+                            <span class="stage-sub">Afluente / Agua Cruda de Entrada</span>
                         </div>
                     </div>
-                    <div class="sensor-stats">
-                        <span class="status-pill status-waiting" id="pill-ph">Esperando datos</span>
-                        <div class="sensor-feedback" id="feedback-ph">Rango seguro potable: 6.5 - 8.5 pH</div>
+                    <span class="stage-tag tag-amber">ENTRADA</span>
+                </div>
+
+                <div class="stage-cards-grid">
+                    <!-- pH Entrada -->
+                    <div class="dashboard-card sensor-card glass stage-card-item" id="card-ph-in">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="droplet" class="title-icon icon-ph"></i>
+                                <span>pH (Entrada)</span>
+                            </div>
+                            <span class="sensor-range">0.0 - 14.0 pH</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="gauge-wrapper">
+                                <svg class="gauge-svg" viewBox="0 0 100 100">
+                                    <circle class="gauge-bg" cx="50" cy="50" r="40" />
+                                    <circle id="gauge-ph-in-progress" class="gauge-progress stroke-amber" cx="50" cy="50" r="40" />
+                                </svg>
+                                <div class="gauge-content">
+                                    <span class="gauge-value" id="val-ph-in">--</span>
+                                    <span class="gauge-unit">pH</span>
+                                </div>
+                            </div>
+                            <div class="sensor-stats">
+                                <span class="status-pill status-waiting" id="pill-ph-in">Esperando datos</span>
+                                <div class="sensor-feedback" id="feedback-ph-in">Agua cruda sin tratar</div>
+                            </div>
+                            <div class="stats-mini-row">
+                                <div class="mini-stat"><span class="lbl">Mín</span><span class="val" id="min-ph-in">--</span></div>
+                                <div class="mini-stat"><span class="lbl">Prom</span><span class="val" id="avg-ph-in">--</span></div>
+                                <div class="mini-stat"><span class="lbl">Máx</span><span class="val" id="max-ph-in">--</span></div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="stats-mini-row">
-                        <div class="mini-stat">
-                            <span class="lbl">Mín</span>
-                            <span class="val" id="min-ph">--</span>
+
+                    <!-- Turbidez Entrada -->
+                    <div class="dashboard-card sensor-card glass stage-card-item" id="card-turb-in">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="waves" class="title-icon icon-turb"></i>
+                                <span>Turbidez (Entrada)</span>
+                            </div>
+                            <span class="sensor-range">0 - 100 NTU</span>
                         </div>
-                        <div class="mini-stat">
-                            <span class="lbl">Promedio</span>
-                            <span class="val" id="avg-ph">--</span>
+                        <div class="card-body">
+                            <div class="turb-display-wrapper">
+                                <div class="metric-big-value">
+                                    <span id="val-turb-in">--</span>
+                                    <span class="unit">NTU</span>
+                                </div>
+                                <div class="indicator-bar-container">
+                                    <div class="indicator-bar bar-amber" id="bar-turb-in" style="width: 0%;"></div>
+                                </div>
+                                <div class="bar-labels"><span>0 NTU</span><span>10 NTU</span><span>&gt; 40 NTU</span></div>
+                            </div>
+                            <div class="sensor-stats">
+                                <span class="status-pill status-waiting" id="pill-turb-in">Esperando datos</span>
+                                <div class="sensor-feedback" id="feedback-turb-in">Carga de sólidos afluente</div>
+                            </div>
+                            <div class="stats-mini-row">
+                                <div class="mini-stat"><span class="lbl">Mín</span><span class="val" id="min-turb-in">--</span></div>
+                                <div class="mini-stat"><span class="lbl">Prom</span><span class="val" id="avg-turb-in">--</span></div>
+                                <div class="mini-stat"><span class="lbl">Máx</span><span class="val" id="max-turb-in">--</span></div>
+                            </div>
                         </div>
-                        <div class="mini-stat">
-                            <span class="lbl">Máx</span>
-                            <span class="val" id="max-ph">--</span>
+                    </div>
+
+                    <!-- Temperatura Entrada -->
+                    <div class="dashboard-card sensor-card glass stage-card-item" id="card-temp-in">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="thermometer" class="title-icon icon-temp"></i>
+                                <span>Temperatura (Entrada)</span>
+                            </div>
+                            <span class="sensor-range">0 - 50 °C</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="temp-display-wrapper">
+                                <div class="metric-big-value">
+                                    <span id="val-temp-in">--</span>
+                                    <span class="unit">°C</span>
+                                </div>
+                                <div class="indicator-bar-container">
+                                    <div class="indicator-bar bar-amber" id="bar-temp-in" style="width: 0%;"></div>
+                                </div>
+                                <div class="bar-labels"><span>0 °C</span><span>25 °C</span><span>50 °C</span></div>
+                            </div>
+                            <div class="sensor-stats">
+                                <span class="status-pill status-waiting" id="pill-temp-in">Esperando datos</span>
+                                <div class="sensor-feedback" id="feedback-temp-in">Temperatura antes del filtro</div>
+                            </div>
+                            <div class="stats-mini-row">
+                                <div class="mini-stat"><span class="lbl">Mín</span><span class="val" id="min-temp-in">--</span></div>
+                                <div class="mini-stat"><span class="lbl">Prom</span><span class="val" id="avg-temp-in">--</span></div>
+                                <div class="mini-stat"><span class="lbl">Máx</span><span class="val" id="max-temp-in">--</span></div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- TARJETA 2: TURBIDEZ -->
-            <div class="dashboard-card sensor-card glass" id="card-turbidity">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i data-lucide="waves" class="title-icon icon-turb"></i>
-                        <span>Turbidez</span>
+            <!-- ETAPA 2: DESPUÉS DE LA FILTRACIÓN (AGUA PURIFICADA / SALIDA) -->
+            <div class="stage-column stage-after-box">
+                <div class="stage-header-badge stage-badge-cyan">
+                    <div class="stage-header-title">
+                        <i data-lucide="sparkles" class="stage-icon"></i>
+                        <div>
+                            <h3>2. Después de la Filtración</h3>
+                            <span class="stage-sub">Efluente / Agua Tratada y Purificada</span>
+                        </div>
                     </div>
-                    <span class="sensor-range">0 - 100 NTU</span>
+                    <span class="stage-tag tag-cyan">SALIDA</span>
                 </div>
-                <div class="card-body">
-                    <div class="turb-display-wrapper">
-                        <div class="metric-big-value">
-                            <span id="val-turb">--</span>
-                            <span class="unit">NTU</span>
-                        </div>
-                        <div class="indicator-bar-container">
-                            <div class="indicator-bar" id="bar-turb" style="width: 0%;"></div>
-                        </div>
-                        <div class="bar-labels">
-                            <span>0 NTU (Cristalina)</span>
-                            <span>5 NTU (Límite OMS)</span>
-                            <span>&gt; 20 NTU</span>
-                        </div>
-                    </div>
-                    <div class="sensor-stats">
-                        <span class="status-pill status-waiting" id="pill-turb">Esperando datos</span>
-                        <div class="sensor-feedback" id="feedback-turb">Norma recomendada: &lt; 5.0 NTU</div>
-                    </div>
-                    <div class="stats-mini-row">
-                        <div class="mini-stat">
-                            <span class="lbl">Mín</span>
-                            <span class="val" id="min-turb">--</span>
-                        </div>
-                        <div class="mini-stat">
-                            <span class="lbl">Promedio</span>
-                            <span class="val" id="avg-turb">--</span>
-                        </div>
-                        <div class="mini-stat">
-                            <span class="lbl">Máx</span>
-                            <span class="val" id="max-turb">--</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- TARJETA 3: TEMPERATURA -->
-            <div class="dashboard-card sensor-card glass" id="card-temperature">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i data-lucide="thermometer" class="title-icon icon-temp"></i>
-                        <span>Temperatura</span>
+                <div class="stage-cards-grid">
+                    <!-- pH Salida -->
+                    <div class="dashboard-card sensor-card glass stage-card-item" id="card-ph-out">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="droplet" class="title-icon icon-ph"></i>
+                                <span>pH (Salida)</span>
+                            </div>
+                            <span class="sensor-range">0.0 - 14.0 pH</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="gauge-wrapper">
+                                <svg class="gauge-svg" viewBox="0 0 100 100">
+                                    <circle class="gauge-bg" cx="50" cy="50" r="40" />
+                                    <circle id="gauge-ph-out-progress" class="gauge-progress" cx="50" cy="50" r="40" />
+                                </svg>
+                                <div class="gauge-content">
+                                    <span class="gauge-value" id="val-ph-out">--</span>
+                                    <span class="gauge-unit">pH</span>
+                                </div>
+                            </div>
+                            <div class="sensor-stats">
+                                <span class="status-pill status-waiting" id="pill-ph-out">Esperando datos</span>
+                                <div class="sensor-feedback" id="feedback-ph-out">Norma OMS: 6.5 - 8.5 pH</div>
+                            </div>
+                            <div class="stats-mini-row">
+                                <div class="mini-stat"><span class="lbl">Mín</span><span class="val" id="min-ph-out">--</span></div>
+                                <div class="mini-stat"><span class="lbl">Prom</span><span class="val" id="avg-ph-out">--</span></div>
+                                <div class="mini-stat"><span class="lbl">Máx</span><span class="val" id="max-ph-out">--</span></div>
+                            </div>
+                        </div>
                     </div>
-                    <span class="sensor-range">0.0 - 50.0 °C</span>
-                </div>
-                <div class="card-body">
-                    <div class="temp-display-wrapper">
-                        <div class="metric-big-value">
-                            <span id="val-temp">--</span>
-                            <span class="unit">°C</span>
+
+                    <!-- Turbidez Salida -->
+                    <div class="dashboard-card sensor-card glass stage-card-item" id="card-turb-out">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="waves" class="title-icon icon-turb"></i>
+                                <span>Turbidez (Salida)</span>
+                            </div>
+                            <span class="sensor-range">0 - 100 NTU</span>
                         </div>
-                        <div class="indicator-bar-container">
-                            <div class="indicator-bar" id="bar-temp" style="width: 0%;"></div>
-                        </div>
-                        <div class="bar-labels">
-                            <span>0 °C</span>
-                            <span>20 °C (Óptima)</span>
-                            <span>50 °C</span>
+                        <div class="card-body">
+                            <div class="turb-display-wrapper">
+                                <div class="metric-big-value">
+                                    <span id="val-turb-out">--</span>
+                                    <span class="unit">NTU</span>
+                                </div>
+                                <div class="indicator-bar-container">
+                                    <div class="indicator-bar" id="bar-turb-out" style="width: 0%;"></div>
+                                </div>
+                                <div class="bar-labels"><span>0 NTU (Cristalina)</span><span>5 NTU (Límite OMS)</span><span>&gt; 20 NTU</span></div>
+                            </div>
+                            <div class="sensor-stats">
+                                <span class="status-pill status-waiting" id="pill-turb-out">Esperando datos</span>
+                                <div class="sensor-feedback" id="feedback-turb-out">Norma potable: &lt; 5.0 NTU</div>
+                            </div>
+                            <div class="stats-mini-row">
+                                <div class="mini-stat"><span class="lbl">Mín</span><span class="val" id="min-turb-out">--</span></div>
+                                <div class="mini-stat"><span class="lbl">Prom</span><span class="val" id="avg-turb-out">--</span></div>
+                                <div class="mini-stat"><span class="lbl">Máx</span><span class="val" id="max-turb-out">--</span></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="sensor-stats">
-                        <span class="status-pill status-waiting" id="pill-temp">Esperando datos</span>
-                        <div class="sensor-feedback" id="feedback-temp">Rango común en agua: 15.0 - 25.0 °C</div>
-                    </div>
-                    <div class="stats-mini-row">
-                        <div class="mini-stat">
-                            <span class="lbl">Mín</span>
-                            <span class="val" id="min-temp">--</span>
+
+                    <!-- Temperatura Salida -->
+                    <div class="dashboard-card sensor-card glass stage-card-item" id="card-temp-out">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="thermometer" class="title-icon icon-temp"></i>
+                                <span>Temperatura (Salida)</span>
+                            </div>
+                            <span class="sensor-range">0 - 50 °C</span>
                         </div>
-                        <div class="mini-stat">
-                            <span class="lbl">Promedio</span>
-                            <span class="val" id="avg-temp">--</span>
-                        </div>
-                        <div class="mini-stat">
-                            <span class="lbl">Máx</span>
-                            <span class="val" id="max-temp">--</span>
+                        <div class="card-body">
+                            <div class="temp-display-wrapper">
+                                <div class="metric-big-value">
+                                    <span id="val-temp-out">--</span>
+                                    <span class="unit">°C</span>
+                                </div>
+                                <div class="indicator-bar-container">
+                                    <div class="indicator-bar" id="bar-temp-out" style="width: 0%;"></div>
+                                </div>
+                                <div class="bar-labels"><span>0 °C</span><span>20 °C (Óptima)</span><span>50 °C</span></div>
+                            </div>
+                            <div class="sensor-stats">
+                                <span class="status-pill status-waiting" id="pill-temp-out">Esperando datos</span>
+                                <div class="sensor-feedback" id="feedback-temp-out">Agua tratada para uso</div>
+                            </div>
+                            <div class="stats-mini-row">
+                                <div class="mini-stat"><span class="lbl">Mín</span><span class="val" id="min-temp-out">--</span></div>
+                                <div class="mini-stat"><span class="lbl">Prom</span><span class="val" id="avg-temp-out">--</span></div>
+                                <div class="mini-stat"><span class="lbl">Máx</span><span class="val" id="max-temp-out">--</span></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -246,10 +428,14 @@
                 <i data-lucide="database" class="telemetry-icon"></i>
                 <div class="telemetry-text">
                     <span class="label">Ruta en Firebase</span>
-                    <span class="value" id="firebase-path-text">sensores/actual</span>
+                    <span class="value" id="firebase-path-text">sensores</span>
                 </div>
             </div>
             <div class="telemetry-actions">
+                <button class="btn btn-sm btn-pdf-outline" id="btn-export-pdf" title="Generar y descargar reporte formal en PDF">
+                    <i data-lucide="file-text" class="btn-icon"></i>
+                    <span>Reporte PDF</span>
+                </button>
                 <button class="btn btn-sm btn-primary-outline" id="btn-export-csv" title="Descargar datos en formato CSV">
                     <i data-lucide="download" class="btn-icon"></i>
                     <span>Exportar CSV</span>
@@ -279,14 +465,17 @@
             </div>
 
             <div class="charts-grid">
-                <!-- GRÁFICA 1: HISTÓRICO DE pH -->
+                <!-- GRÁFICA 1: HISTÓRICO DE pH (ANTES VS DESPUÉS) -->
                 <div class="dashboard-card chart-card glass">
                     <div class="card-header">
                         <div class="card-title">
                             <i data-lucide="droplet" class="title-icon icon-ph"></i>
-                            <span>Histórico de pH</span>
+                            <span>Histórico Comparativo de pH</span>
                         </div>
-                        <div class="chart-badge" id="chart-badge-ph">-- pH</div>
+                        <div class="chart-badges-group">
+                            <span class="badge-stage badge-stage-before" id="chart-badge-ph-in">Antes: -- pH</span>
+                            <span class="badge-stage badge-stage-after" id="chart-badge-ph-out">Después: -- pH</span>
+                        </div>
                     </div>
                     <div class="card-body chart-body">
                         <div class="chart-container">
@@ -295,14 +484,17 @@
                     </div>
                 </div>
 
-                <!-- GRÁFICA 2: HISTÓRICO DE TURBIDEZ -->
+                <!-- GRÁFICA 2: HISTÓRICO DE TURBIDEZ (ANTES VS DESPUÉS) -->
                 <div class="dashboard-card chart-card glass">
                     <div class="card-header">
                         <div class="card-title">
                             <i data-lucide="waves" class="title-icon icon-turb"></i>
                             <span>Histórico de Turbidez (NTU)</span>
                         </div>
-                        <div class="chart-badge" id="chart-badge-turb">-- NTU</div>
+                        <div class="chart-badges-group">
+                            <span class="badge-stage badge-stage-before" id="chart-badge-turb-in">Antes: -- NTU</span>
+                            <span class="badge-stage badge-stage-after" id="chart-badge-turb-out">Después: -- NTU</span>
+                        </div>
                     </div>
                     <div class="card-body chart-body">
                         <div class="chart-container">
@@ -311,14 +503,17 @@
                     </div>
                 </div>
 
-                <!-- GRÁFICA 3: HISTÓRICO DE TEMPERATURA -->
+                <!-- GRÁFICA 3: HISTÓRICO DE TEMPERATURA (ANTES VS DESPUÉS) -->
                 <div class="dashboard-card chart-card glass">
                     <div class="card-header">
                         <div class="card-title">
                             <i data-lucide="thermometer" class="title-icon icon-temp"></i>
                             <span>Histórico de Temperatura (°C)</span>
                         </div>
-                        <div class="chart-badge" id="chart-badge-temp">-- °C</div>
+                        <div class="chart-badges-group">
+                            <span class="badge-stage badge-stage-before" id="chart-badge-temp-in">Antes: -- °C</span>
+                            <span class="badge-stage badge-stage-after" id="chart-badge-temp-out">Después: -- °C</span>
+                        </div>
                     </div>
                     <div class="card-body chart-body">
                         <div class="chart-container">
@@ -346,6 +541,9 @@
         </section>
 
     </div>
+
+    <!-- Contenedor de notificaciones flotantes (Toast) -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
     <!-- Scripts de la aplicación -->
     <script src="js/charts.js"></script>
