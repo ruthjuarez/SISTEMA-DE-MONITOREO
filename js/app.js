@@ -336,6 +336,15 @@ function processIncomingReading(data, ui) {
     let tempOut = extractNumber(despuesObj, 'temperatura', 'temperature', 'temp', 'tempC') ??
                   extractNumber(data, 'temperatura_despues', 'temp_out', 'temp_salida', 'temperatura_salida');
 
+    // Validar disponibilidad de sensores de salida
+    if (data.salida?.online === false) {
+        phOut = null;
+        turbOut = null;
+        tempOut = null;
+    } else if (data.salida?.turbidez_estado === "SENSOR DESCONECTADO") {
+        turbOut = null;
+    }
+    if (!data.entrada && !data.salida) {
     // 4. Retrocompatibilidad: Si solo se enviaron claves raíz (ph, turbidez, temperatura)
     if (phOut === null && phIn === null && data.ph !== undefined) {
         phOut = parseFloat(data.ph);
@@ -347,13 +356,12 @@ function processIncomingReading(data, ui) {
         tempOut = parseFloat(data.temperatura ?? data.temp);
     }
 
+    }
+
     // Si aún no tenemos ambos valores, mantener el anterior en caché o reflejar
     if (phIn === null && AppState.currentData.antes.ph !== null) phIn = AppState.currentData.antes.ph;
-    if (phOut === null && AppState.currentData.despues.ph !== null) phOut = AppState.currentData.despues.ph;
     if (turbIn === null && AppState.currentData.antes.turb !== null) turbIn = AppState.currentData.antes.turb;
-    if (turbOut === null && AppState.currentData.despues.turb !== null) turbOut = AppState.currentData.despues.turb;
     if (tempIn === null && AppState.currentData.antes.temp !== null) tempIn = AppState.currentData.antes.temp;
-    if (tempOut === null && AppState.currentData.despues.temp !== null) tempOut = AppState.currentData.despues.temp;
 
     // Verificar si llegó al menos un dato numérico válido
     const hasAnyValidData = phIn !== null || phOut !== null || turbIn !== null || turbOut !== null || tempIn !== null || tempOut !== null;
@@ -375,11 +383,16 @@ function processIncomingReading(data, ui) {
     // 5. Cálculos de Rendimiento del Filtro
     let turbRemoved = (turbIn !== null && turbOut !== null) ? Math.max(0, turbIn - turbOut) : null;
     let efficiencyPct = null;
-    if (turbIn !== null && turbOut !== null && turbIn > 0) {
+    if (turbIn !== null && turbOut !== null && turbIn > 0 && data.salida?.online !== false && data.salida?.turbidez_estado !== "SENSOR DESCONECTADO" && data.turbidez_estado !== "SENSOR DESCONECTADO") {
         efficiencyPct = Math.max(0, Math.min(100, ((turbIn - turbOut) / turbIn) * 100));
     }
     let phDelta = (phIn !== null && phOut !== null) ? (phOut - phIn) : null;
     let tempDelta = (tempIn !== null && tempOut !== null) ? (tempOut - tempIn) : null;
+
+    // Limpiar valores actuales de salida cuando no exista lectura valida
+    AppState.currentData.despues.ph = phOut;
+    AppState.currentData.despues.turb = turbOut;
+    AppState.currentData.despues.temp = tempOut;
 
     // Actualizar caché de AppState
     if (phIn !== null) AppState.currentData.antes.ph = phIn;
@@ -433,16 +446,49 @@ function processIncomingReading(data, ui) {
         updateStat('efficiency', efficiencyPct);
     }
 
+    // Limpiar indicadores actuales de salida sin borrar el historial
+    function limpiarIndicadorSalida(valor, barra, estado, descripcion, mensaje) {
+        if (valor) valor.textContent = "--";
+        if (barra) {
+            barra.style.width = "0%";
+            barra.style.strokeDashoffset = "";
+        }
+        if (estado) {
+            estado.className = "status-pill status-neutral";
+            estado.textContent = mensaje;
+        }
+        if (descripcion) descripcion.textContent = "Sin medicion actual disponible";
+    }
+
+    if (phOut === null) {
+        limpiarIndicadorSalida(ui.valPhOut, null, ui.pillPhOut, ui.feedbackPhOut, "SIN DATOS");
+        if (ui.gaugePhOutProgress) {
+            ui.gaugePhOutProgress.style.strokeDashoffset = "999";
+        }
+    }
+
+    if (turbOut === null) {
+        limpiarIndicadorSalida(
+            ui.valTurbOut, ui.barTurbOut, ui.pillTurbOut,
+            ui.feedbackTurbOut,
+            data.salida?.turbidez_estado === "SENSOR DESCONECTADO"
+                ? "SENSOR DESCONECTADO" : "SIN DATOS"
+        );
+    }
+
+    if (tempOut === null) {
+        limpiarIndicadorSalida(ui.valTempOut, ui.barTempOut, ui.pillTempOut, ui.feedbackTempOut, "SIN DATOS");
+    }
     // 9. Actualizar Gráficas Comparativas (Línea Antes vs Línea Después)
     if (typeof addChartReading === 'function') {
         addChartReading(
             timeStr,
-            phIn !== null ? phIn : (phOut !== null ? phOut : 0),
-            phOut !== null ? phOut : (phIn !== null ? phIn : 0),
-            turbIn !== null ? turbIn : (turbOut !== null ? turbOut : 0),
-            turbOut !== null ? turbOut : (turbIn !== null ? turbIn : 0),
-            tempIn !== null ? tempIn : (tempOut !== null ? tempOut : 0),
-            tempOut !== null ? tempOut : (tempIn !== null ? tempIn : 0)
+            phIn !== null ? phIn : null,
+            phOut !== null ? phOut : null,
+            turbIn !== null ? turbIn : null,
+            turbOut !== null ? turbOut : null,
+            tempIn !== null ? tempIn : null,
+            tempOut !== null ? tempOut : null
         );
     }
 
